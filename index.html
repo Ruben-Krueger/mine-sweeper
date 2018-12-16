@@ -14,6 +14,8 @@
 <body>
 
 <h1 class="text-center">Mine Sweeper</h1>
+<h3 class="text-center" id="score">Score: 0</h3>
+<h3 class="text-center"></h3>
 
 
 <canvas id="canvas" width="500" height="500">
@@ -25,114 +27,125 @@
     const canvas = document.getElementById("canvas");
     var ctx = canvas.getContext("2d");
 
-
     // Board constants
     const NUM_ROWS = 20;
     const NUM_COLS = 20;
-
     const CELL_SIZE = 25;
     const CELL_LINE_WIDTH = 6;
 
-
     // Probability that a given cell is a mine
     const MINE_PROB = 0.25;
-
-
 
     var board;
 
     var score = 0;
 
+    var gameIsOver = false;
 
     // An individual board cell
     function Cell(x, y, isMine) {
-
         this.x = x;
         this.y = y;
         this.isMine = isMine;
-        this.numberOfNeighbors = undefined;
-        this.isClicked = false;
 
+
+        // Number of adjacent cells that are mines. This number is calculated after every cell is created.
+        this.numberOfNeighbors = undefined;
 
         this.update = function() {
-
             if(this.isMine) {
                 ctx.fillStyle = "red";
                 ctx.font = "14px Arial";
                 ctx.fillText("X", this.x + 10, this.y + 16);
-
                 gameOver();
             }
             else {
+                updateScore();
 
                 ctx.fillStyle = "#0095DD";
                 ctx.fillRect(this.x + CELL_LINE_WIDTH / 2, this.y + CELL_LINE_WIDTH / 2, CELL_SIZE - CELL_LINE_WIDTH, CELL_SIZE - CELL_LINE_WIDTH);
-
-
                 ctx.fillStyle = "white";
                 ctx.font = "14px Arial";
                 ctx.fillText(this.numberOfNeighbors, this.x + 10, this.y + 16);
-
             }
-
         };
-
-
 
         this.render = function() {
             ctx.rect(this.x, this.y, CELL_SIZE, CELL_SIZE);
-
             ctx.fillStyle = "#eee";
             ctx.fillRect(this.x, this.y, CELL_SIZE, CELL_SIZE);
-
             ctx.strokeStyle="white";
             ctx.lineWidth= CELL_LINE_WIDTH;
             ctx.stroke();
-
         };
 
 
+        this.clear = function() {
 
+            if(this.isMine) return;
+
+            updateScore();
+
+            ctx.fillStyle = "#0095DD";
+            ctx.fillRect(this.x + CELL_LINE_WIDTH / 2, this.y + CELL_LINE_WIDTH / 2, CELL_SIZE - CELL_LINE_WIDTH, CELL_SIZE - CELL_LINE_WIDTH);
+            ctx.fillStyle = "white";
+            ctx.font = "14px Arial";
+            ctx.fillText(this.numberOfNeighbors, this.x + 10, this.y + 16);
+
+        }
     }
-
 
     function gameOver() {
+        gameIsOver = true;
+
+        // Display all of the mines
+        for(let i = 0; i < NUM_ROWS; i ++) {
+            for(let j = 0; j < NUM_COLS; j ++) {
+
+                let cell = board.cells[i][j];
+
+                if(cell.isMine) {
+                    ctx.fillStyle = "red";
+                    ctx.font = "14px Arial";
+                    ctx.fillText("X", cell.x + 10, cell.y + 16);
+                }
+
+            }
+        }
+
 
     }
 
 
+    function updateScore() {
+        score ++;
+        document.getElementById('score').innerText = `Score: ${score}`;
+
+    }
 
     function Board() {
 
         this.cells = [];
 
         this.outOfBounds = function(row, col, i, j) {
-
             if(row + i === -1 || col + j === -1) return true;
             else if(row + i === NUM_ROWS || col + j === NUM_COLS) return true;
             else return false;
-
         };
 
         this.clear = function(row, col) {
-
             if(board.cells[row][col].numberOfNeighbors > 0) return;
 
             for(let i = -1; i < 2; i ++) {
                 for(let j = -1; j < 2; j ++) {
-
-                    if(!this.outOfBounds(row, col, i, j) || (i === 0 && j === 0)) {
-                        this.cells[row + i][col + j].update();
+                    if(!(this.outOfBounds(row, col, i, j) || (i === 0 && j === 0))) {
+                        this.cells[row + i][col + j].clear();
                     }
-
                 }
             }
         };
 
-
-
         this.calculateNeighbors = function(row, col) {
-
             // Number of neighbors that are a mine
             let numberOfNeighbors = 0;
 
@@ -141,34 +154,21 @@
 
                     if(this.outOfBounds(row, col, i, j) || (i === 0 && j === 0)) continue;
 
-                    // if(typeof this.cells[row + i][col + j] === 'undefined' || (i === 0 && j === 0)) continue;
-
-
                     var neighbor = this.cells[row + i][col + j];
 
                     if(neighbor.isMine) numberOfNeighbors ++;
-
-
                 }
             }
-
             this.cells[row][col].numberOfNeighbors = numberOfNeighbors;
         };
 
-
         this.init = function() {
-
-
             // Create cells and render them
             for(let i = 0; i < NUM_ROWS; i ++) {
-
                 // Because of Javascript memory bug
                 this.cells.push([]);
-
                 for(let j = 0; j < NUM_COLS; j ++) {
-
                     let isMine = Math.random() <= MINE_PROB;
-
                     this.cells[i][j] = new Cell(i * CELL_SIZE, j * CELL_SIZE, isMine);
                     this.cells[i][j].render();
                 }
@@ -179,40 +179,35 @@
                     this.calculateNeighbors(i,j);
                 }
             }
-
         };
 
-
         this.update = function(e){
+
+            if(gameIsOver) return;
+
             const rect = canvas.getBoundingClientRect();
             const canvasX = e.clientX - rect.left;
             const canvasY = e.clientY - rect.top;
-
             const row = Math.floor(canvasX / CELL_SIZE);
             const col = Math.floor(canvasY / CELL_SIZE);
 
-            board.cells[row][col].isClicked = true;
+            // Uncover the cell which was clicked
             board.cells[row][col].update();
 
+            // Uncover adjacent-non mine cells
             board.clear(row, col);
-
-
-
         }
-
-
     }
-
 
     function init() {
         board = new Board();
         board.init();
         canvas.addEventListener("click", board.update);
-
     }
 
-
     init();
+
+
 
 </script>
 
